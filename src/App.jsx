@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ProjectRecommendations from './ProjectRecommendations';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const OPENROUTER_MODEL = 'meta-llama/llama-3.1-8b-instruct'
@@ -79,6 +80,14 @@ function PhaseCard({ phase, isLast }) {
             </li>
           ))}
         </ul>
+        {/* Recommended Projects and Learning Resources */}
+{(phase.projects?.length > 0 || phase.resources?.length > 0) && (
+  <ProjectRecommendations
+    projects={phase.projects}
+    resources={phase.resources}
+
+  />
+)}
       </div>
     </div>
   )
@@ -92,24 +101,84 @@ async function generateRoadmap({ careerGoal, currentSkills, timeAvailable }) {
     )
   }
 
-  const prompt = `You are an expert career coach. Create a personalized learning roadmap based on the following:
+  const prompt = `
+You are an expert career coach.
 
-Career Goal: ${careerGoal}
-Current Skills: ${currentSkills}
-Time Available: ${timeAvailable}
+Create a personalized learning roadmap based on:
 
-Return ONLY valid JSON (no markdown, no code fences) in this exact shape:
+Target Job Role:
+${careerGoal}
+
+Programming Languages & Skills:
+${currentSkills}
+
+Available Learning Time:
+${timeAvailable}
+
+The roadmap must be strongly related to the Target Job Role and the Programming Languages & Skills.
+
+For each phase provide:
+
+1. Skills to learn
+2. At least one practical real-world project
+3. A short project description
+4. Technologies required for the project
+5. Relevant tutorial websites
+6. Relevant YouTube learning resources
+
+Projects must be practical and useful for the Target Job Role.
+
+Tutorials and YouTube resources must be directly related to the skills and projects.
+
+Do NOT recommend unrelated technologies.
+
+Return ONLY valid JSON in exactly this format:
+
 {
   "phases": [
     {
       "title": "Phase title",
-      "duration": "e.g. Weeks 1-4",
-      "skills": ["skill 1", "skill 2", "skill 3"]
+      "duration": "Weeks 1-2",
+      "skills": [
+        "Skill 1",
+        "Skill 2",
+        "Skill 3"
+      ],
+      "projects": [
+        {
+          "title": "Project title",
+          "description": "Short project description",
+          "technologies": [
+            "Python",
+            "Flask",
+            "SQL"
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "title": "Python Tutorial",
+          "platform": "W3Schools",
+          "url": "https://www.w3schools.com/python/"
+        },
+        {
+          "title": "Python Web Development Tutorial",
+          "platform": "YouTube",
+          "url": "https://www.youtube.com/results?search_query=python+web+development+tutorial"
+        }
+      ]
     }
   ]
 }
 
-Create 4-6 phases that fit within the time available. Each phase should have 3-5 skills to learn. Be specific and actionable.`
+Create 4-6 phases that fit within the available time.
+
+Make all recommendations specific to the Target Job Role:
+${careerGoal}
+
+Use the user's Programming Languages & Skills:
+${currentSkills}
+`;
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
@@ -138,16 +207,19 @@ Create 4-6 phases that fit within the time available. Each phase should have 3-5
   }
 
   const parsed = JSON.parse(jsonMatch[0])
-  if (!parsed.phases?.length) {
-    throw new Error('No roadmap phases were returned')
-  }
 
-  return parsed.phases.map((phase, index) => ({
-    number: index + 1,
-    title: phase.title,
-    duration: phase.duration,
-    skills: phase.skills,
-  }))
+if (!parsed.phases?.length) {
+  throw new Error('No roadmap phases were returned')
+}
+
+return parsed.phases.map((phase, index) => ({
+  number: index + 1,
+  title: phase.title,
+  duration: phase.duration,
+  skills: phase.skills || [],
+  projects: phase.projects || [],
+  resources: phase.resources || [],
+}))
 }
 
 function RoadmapTimeline({ phases, careerGoal }) {
